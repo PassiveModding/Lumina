@@ -15,33 +15,33 @@ namespace Lumina.Models.Materials
         /// The path to this Material. May be relative or absolute.
         /// </summary>
         public string MaterialPath { get; private set; }
-        
+
         /// <summary>
         /// The resolved path to this Material. Guaranteed to not be initialized
         /// in the case that <c>MaterialPath.StartsWith("/") == true</c>.
         /// </summary>
         public string? ResolvedPath { get; private set; }
-        
+
         /// <summary>
         /// A convenience reference to the Model that instantiated this Material.
         /// </summary>
         public Model Parent { get; private set; }
-        
+
         /// <summary>
         /// The MtrlFile backing this Material. May not be initialized.
         /// </summary>
         public MtrlFile? File { get; private set; }
-        
+
         /// <summary>
         /// The Textures for this Material. May not be initialized.
         /// </summary>
         public Texture[] Textures { get; private set; }
-        
+
         /// <summary>
         /// The shader package name used by this Material.
         /// </summary>
         public string ShaderPack { get; private set; }
-        
+
         /// <summary>
         /// The variant ID for this Material. This is specified by the caller
         /// for relative paths and inferred for absolute paths or instantiation
@@ -60,7 +60,7 @@ namespace Lumina.Models.Materials
         public Material( string path, int variantId = 1 )
         {
             MaterialPath = path;
-            VariantId = !path.StartsWith( "/" ) ? GetVariantIdFromPath( path ) : variantId;
+            VariantId    = !path.StartsWith( "/" ) ? GetVariantIdFromPath( path ) : variantId;
         }
 
         /// <summary>
@@ -73,9 +73,9 @@ namespace Lumina.Models.Materials
         /// <param name="variantId">The variant ID for this material. Default is 1.</param>
         public Material( Model parent, string path, int variantId = 1 )
         {
-            Parent = parent;
+            Parent       = parent;
             MaterialPath = path;
-            VariantId = variantId;
+            VariantId    = variantId;
         }
 
         /// <summary>
@@ -85,8 +85,15 @@ namespace Lumina.Models.Materials
         /// <param name="file">The MtrlFile to back this Material.</param>
         public Material( MtrlFile file )
         {
-            File = file;
+            File      = file;
             VariantId = GetVariantIdFromPath( file.FilePath );
+            BuildMaterial();
+        }
+
+        public Material( MtrlFile file, int variantId )
+        {
+            File      = file;
+            VariantId = variantId;
             BuildMaterial();
         }
 
@@ -101,6 +108,7 @@ namespace Lumina.Models.Materials
         public Material( GameData data, string path, int variantId = 1 )
         {
             MaterialPath = path;
+            VariantId    = variantId;
             BuildMaterial();
             Update( data );
         }
@@ -117,22 +125,14 @@ namespace Lumina.Models.Materials
             if( MaterialPath.StartsWith( "/" ) )
             {
                 ResolvedPath = ResolveRelativeMaterialPath( MaterialPath, VariantId );
+                if( ResolvedPath == null ) { return this; }
 
-                if( ResolvedPath == null )
-                {
-                    return this;
-                }
-                
                 File = data.GetFile< MtrlFile >( ResolvedPath );
             }
-            else
-            {
-                File = data.GetFile< MtrlFile >( MaterialPath );
-            }
+            else { File = data.GetFile< MtrlFile >( MaterialPath ); }
 
             if( File != null )
                 BuildMaterial();
-
             return this;
         }
 
@@ -146,11 +146,10 @@ namespace Lumina.Models.Materials
         /// <returns>The resolved, absolute path to the requested material, or null if unsuccessful.</returns>
         public static string? ResolveRelativeMaterialPath( string relativePath, int variantId )
         {
-            var id1 = relativePath[4];
+            var id1  = relativePath[ 4 ];
             var val1 = relativePath.Substring( 5, 4 );
-            var id2 = relativePath[9];
+            var id2  = relativePath[ 9 ];
             var val2 = relativePath.Substring( 10, 4 );
-
             return ( id1, id2 ) switch
             {
                 ('c', 'a') => $"chara/accessory/a{val2}/material/v{variantId:D4}{relativePath}",
@@ -163,27 +162,25 @@ namespace Lumina.Models.Materials
                 ('d', 'e') => $"chara/demihuman/d{val1}/obj/equipment/e{val2}/material/v{variantId:D4}{relativePath}",
                 ('m', 'b') => $"chara/monster/m{val1}/obj/body/b{val2}/material/v{variantId:D4}{relativePath}",
                 ('w', 'b') => $"chara/weapon/w{val1}/obj/body/b{val2}/material/v{variantId:D4}{relativePath}",
-                (_, _) => null
+                (_, _)     => null
             };
         }
-        
+
         /// <summary>
         /// Parse the variant ID out of an existing absolute path to a .mtrl file.
         /// </summary>
         /// <param name="matPath">The absolute path to an existing .mtrl file.</param>
         /// <returns>The variant ID for the given .mtrl path. In case of error, 1.</returns>
-        public static int GetVariantIdFromPath(string matPath) {
-            var v = 1;
-            var vStart = matPath.IndexOf("/v", StringComparison.Ordinal );
+        public static int GetVariantIdFromPath( string matPath )
+        {
+            var v      = 1;
+            var vStart = matPath.IndexOf( "/v", StringComparison.Ordinal );
             if( vStart == -1 )
                 return v;
-            var vSub = matPath.Substring(vStart + 2, 4);
-            try
-            {
-                v = int.Parse( vSub );
-            }
+            var vSub = matPath.Substring( vStart + 2, 4 );
+            try { v = int.Parse( vSub ); }
             catch( FormatException ) { }
-            
+
             return v;
         }
 
@@ -191,20 +188,18 @@ namespace Lumina.Models.Materials
         {
             ReadStrings();
             ReadTextures();
-
             ShaderPack = StringOffsetToStringMap[ File.FileHeader.ShaderPackageNameOffset ];
         }
 
         private void ReadTextures()
         {
             Textures = new Texture[File.TextureOffsets.Length];
-
             for( int i = 0; i < File.TextureOffsets.Length; i++ )
             {
-                TextureUsage raw = (TextureUsage) File.Samplers[ i ].SamplerId;
-                var texIndex = File.Samplers[ i ].TextureIndex;
-                var texOffset = File.TextureOffsets[ texIndex ].Offset;
-                var texPath = StringOffsetToStringMap[ texOffset ];
+                TextureUsage raw       = (TextureUsage)File.Samplers[ i ].SamplerId;
+                var          texIndex  = File.Samplers[ i ].TextureIndex;
+                var          texOffset = File.TextureOffsets[ texIndex ].Offset;
+                var          texPath   = StringOffsetToStringMap[ texOffset ];
                 Textures[ i ] = new Texture( this, raw, texPath );
             }
         }
@@ -213,19 +208,17 @@ namespace Lumina.Models.Materials
         {
             StringOffsetToStringMap = new Dictionary< int, string >();
             var br = new LuminaBinaryReader( File.Strings );
-
             // They re-use offsets, so the number of offsets is not equal to the number of unique members
-            var uniqueTextureCount = File.TextureOffsets.Select( t => t.Offset ).Distinct().Count();
-            var uniqueUvColorSetCount = File.UvColorSets.Select( t => t.NameOffset ).Distinct().Count();
+            var uniqueTextureCount     = File.TextureOffsets.Select( t => t.Offset ).Distinct().Count();
+            var uniqueUvColorSetCount  = File.UvColorSets.Select( t => t.NameOffset ).Distinct().Count();
             var uniqueColorOffsetCount = File.ColorSets.Select( t => t.NameOffset ).Distinct().Count();
-
             // Add one for the shader package name at the end
             var stringCount = uniqueTextureCount + uniqueUvColorSetCount + uniqueColorOffsetCount + 1;
             for( int i = 0; i < stringCount; i++ )
             {
-                long startOffset = br.BaseStream.Position;
-                string tmp = br.ReadStringData();
-                StringOffsetToStringMap[ (int) startOffset ] = tmp;
+                long   startOffset = br.BaseStream.Position;
+                string tmp         = br.ReadStringData();
+                StringOffsetToStringMap[ (int)startOffset ] = tmp;
             }
 
             br.Dispose();
